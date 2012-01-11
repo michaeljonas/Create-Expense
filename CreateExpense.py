@@ -28,14 +28,14 @@ class Event_Index:
 # reads the iCal file and parses the needed data (date and start_id)
 # requires a iCal file
 # returned list will have date, time, and start_id in that order
-def CreateCalList():
+def CreateEvent_list():
 	file = open('/Users/mjonas/Desktop/Completed.ics', 'r')
 	summaryline = ""														# line containing the start_id from the file
 	dateString = ""															# line containing the date from the file
 	date = 0																# date of event as an int
 	time = 0																# time of event as an int
 	initials = ["cm", "et", "jm", "sb", "dw", "torrance", "ets", "jms"]		# keys to be searched for in the file
-	calList = []															# list to hold the parsed data
+	event_list = []															# list to hold the parsed data
 	
 	# returns the date range, the 16th of last month to the 15th of this month
 	(start, end) = FindDateRange()
@@ -63,12 +63,12 @@ def CreateCalList():
 						# if the date is in the needed range (16th of last month<date<15th of this month)
 						# append it to the list
 						if date >= start and date <= end:
-							calList.append([date, time, summaryline])
+							event_list.append([date, time, summaryline])
 						break
 	# sort the list by date and time
-	calList.sort()
+	event_list.sort()
 	file.close()
-	return calList
+	return event_list
 
 # reads the addresses file and creates a list of addresses with their corrisponding ids
 # requires a file with the location id and address delineated by a space
@@ -111,67 +111,67 @@ def CreateDistanceList():
 # this function will take the list and append the corrisponding address
 # requires the list of events and the index of the id of the event in the list for which an address will be appended
 # returns the original list with addresses for each location appended
-def AssignAddresses(calList, id):
+def AssignAddresses(event_list, id):
 	addressList = []					# list of id/names and their corrisponding addreses
 	addressList = CreateAddressList()
-	# loop through the calList, if the id is not home, look for the matching id in the address list
-	for i, event in enumerate(calList):
+	# loop through the event_list, if the id is not home, look for the matching id in the address list
+	for i, event in enumerate(event_list):
 		if event[id] != "home" and event[Event_Index.START_ID] != "home":
 			for j, address in enumerate(addressList):
 				if event[id] == address[0]:
 					# append the appropriate address to the list
 					event.append(address[1])
 					break
-	return calList
+	return event_list
 
 # this funciton inserts the home location at the beginning of each day and the end of each day
-# requires the calList
-# returns the calList with the home locations inserted
-def InsertHome(calList):
+# requires the event_list
+# returns the event_list with the home locations inserted
+def InsertHome(event_list):
 	# insert home entry at the begining of the list
-	calList.insert(0, [calList[0][Event_Index.DATE], 0, "home", "home less milage", calList[0][Event_Index.START_ID], calList[0][Event_Index.START_ADDRESS]])
+	event_list.insert(0, [event_list[0][Event_Index.DATE], 0, "home", "home less milage", event_list[0][Event_Index.START_ID], event_list[0][Event_Index.START_ADDRESS]])
 	# loop through the list inserting home location at the end and beginning of each day
-	for i, event in enumerate(calList):
-		if i!=0 and calList[i-1][Event_Index.DATE] != event[Event_Index.DATE]:
+	for i, event in enumerate(event_list):
+		if i!=0 and event_list[i-1][Event_Index.DATE] != event[Event_Index.DATE]:
 			# inserting at the beginning of the day
-			calList.insert(i, [event[Event_Index.DATE], 0, "home", "home less milage", event[Event_Index.START_ID], event[Event_Index.START_ADDRESS]])
+			event_list.insert(i, [event[Event_Index.DATE], 0, "home", "home less milage", event[Event_Index.START_ID], event[Event_Index.START_ADDRESS]])
 			# inserting at the end of the day
-			calList[i-1].append("home")
-			calList[i-1].append("Home Less Milage")
+			event_list[i-1].append("home")
+			event_list[i-1].append("Home Less Milage")
 	# inserting at the end of the list
-	calList[len(calList)-1].append("home")
-	calList[len(calList)-1].append("Home Less Milage")
-	return calList
+	event_list[len(event_list)-1].append("home")
+	event_list[len(event_list)-1].append("Home Less Milage")
+	return event_list
 
 # this function appends the ending location to each event in the list, the ending locations are determined
 # by the locaiton of the next event in the list and its date
-# requires the calList of events
-# returns the calList of events with corrisponding ending locations for each event
-def AssignEndLocation(calList):
+# requires the event_list
+# returns the event_list with corrisponding ending locations for each event
+def AssignEndLocation(event_list):
 	# loops through the list, checks if the event contains a "home" id and skips those since they have
 	# already been assigned, then assigns the ending locaitons
-	for i, event in enumerate(calList):
+	for i, event in enumerate(event_list):
 		if event[Event_Index.START_ID] != "home" and len(event) == 4:
-			event.append(calList[i+1][Event_Index.START_ID])
-	return calList
+			event.append(event_list[i+1][Event_Index.START_ID])
+	return event_list
 
 # this function appends the distance between the two location in each event
-# it requires the calList of events and the list of distances between each event
-# returns the calList with with distances between each event appended
-def AssignDistance(calList):
+# it requires the event_list and the list of distances between each event
+# returns the event_list with with distances between each event appended
+def AssignDistance(event_list):
 	distanceList = CreateDistanceList()
-	for i, event in enumerate(calList):
+	for i, event in enumerate(event_list):
 		for j, distance in enumerate(distanceList):
 			if ((event[Event_Index.START_ID] == distance[0] and event[Event_Index.END_ID] == distance[1]) or (event[Event_Index.END_ID] == distance[0] and event[Event_Index.START_ID] == distance[1])):
 				event.append(int(distance[2]))
 				break
-	return calList
+	return event_list
 
 # this function appends the appropriate comments displaying the need for each entry in the expense report
-# it requires the calList of events
-# returns the calList with the comments appended
-def AssignComments(calList):
-	for i, event in enumerate(calList):
+# it requires the event_list
+# returns the event_list with the comments appended
+def AssignComments(event_list):
+	for i, event in enumerate(event_list):
 		endId = event[Event_Index.END_ID]
 		startId = event[Event_Index.START_ID]
 		# if the end location is home and the start location is not the torrace office
@@ -187,7 +187,7 @@ def AssignComments(calList):
 		# if the end location is other than the torrance office or home
 		else:
 			event.append("Client Appointment(%s)" %(endId[:2]))
-	return calList
+	return event_list
 
 # this function returns the date range, the start date, date of the 16th of the previous month
 # and the end date, the 15th of the current month, in the format YYYYMMDD,
@@ -218,9 +218,9 @@ def GetPrintDate(date):
 	temp = str(date)
 	return "%s/%s/%s" %(temp[4:6], temp[6:], temp[0:4])
 
-# this function takes the calList of events and prints it to a CSV file with each event on a new line
+# this function takes the event_list and prints it to a CSV file with each event on a new line
 # it inserts a blank line every 28 entries to provided easier cuting and pasting into the template
-# it requires the calList of events
+# it requires the event_list
 # it prints to the expense.csv file located on the desktop in the format
 # date,distance,start_address,end_address,comments
 def PrintToCsv(aList):
@@ -228,7 +228,7 @@ def PrintToCsv(aList):
 	totalDistance = 0		# total distance, printed and reset each 28 lines printed
 	file = open('/Users/mjonas/Desktop/expense.csv', 'w')
 	
-	for i, event in enumerate(calList):
+	for i, event in enumerate(event_list):
 		date_of_event = GetPrintDate(event[Event_Index.DATE])
 		if int(event[Event_Index.DISTANCE]) > 0:
 			file.write("%s,%s,%s,%s,%s\n" %(date_of_event,event[Event_Index.DISTANCE],event[Event_Index.START_ADDRESS],event[Event_Index.END_ADDRESS],event[Event_Index.COMMENTS]))
@@ -245,20 +245,20 @@ def PrintToCsv(aList):
 # this function prints a list of lists to the terminal
 # it requires a list of lists
 # it prints each list from the list of lists on a seperate line and then prints the number of lists printed
-def printList(calList):
+def printList(event_list):
 	count = 0
 	print
-	for item in calList:
+	for item in event_list:
 		print item
 		count+=1
 	print "the number of lists printed: %s\n" %(count)
 
-calList = CreateCalList()
-calList = AssignAddresses(calList, Event_Index.START_ID)
-calList = InsertHome(calList)
-calList = AssignEndLocation(calList)
-calList = AssignAddresses(calList, Event_Index.END_ID)
-calList = AssignDistance(calList)
-calList = AssignComments(calList)
-#printList(calList)
-PrintToCsv(calList)
+event_list = CreateEvent_list()
+event_list = AssignAddresses(event_list, Event_Index.START_ID)
+event_list = InsertHome(event_list)
+event_list = AssignEndLocation(event_list)
+event_list = AssignAddresses(event_list, Event_Index.END_ID)
+event_list = AssignDistance(event_list)
+event_list = AssignComments(event_list)
+#printList(event_list)
+PrintToCsv(event_list)
