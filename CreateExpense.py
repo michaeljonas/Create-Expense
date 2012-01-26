@@ -5,13 +5,13 @@
 # address, ending address, and comments for while that drive was needed.
 
 # to do:
-# 1 add gui to facilitate the addition of new locations, execution of the program, and change of date range
-# 2 possibly add google maps support to replace the need of inputing distances by hand however this
-# may not be practical since they are drive paths and the google maps drive path may not be representive
-# of the actual drive path
-# 3 add support for other locations, such as "all staff" or other offices
+# 1 change address_list and distance_list to dict
+# 2 add user defined location descriptions
+# 3 add user defined vars i.e. path to ical export, date range, output destination
+# 4 add gui to facilitate the addition of new locations, execution of the program, and change of date range
+# 5 extend google maps support to replace the need of inputing distances if the user decides to do so
 
-
+import webbrowser
 from datetime import date
 
 # enumerated variables for the index of the events in the list
@@ -25,17 +25,30 @@ class Event_Index:
 	DISTANCE = 6		# driving distance between the two locations
 	COMMENTS = 7		# comments of why the trip was made
 
+def CreateKeyIds():
+	file = open('./addresses.txt', 'r')
+	id = ""
+	key_ids = []
+	temp = []
+	
+	for line in file:
+		temp = line.split(" ")
+		key_ids.append(temp[0])
+	
+	return key_ids
+
 # reads the iCal file and parses the needed data (date and start_id)
 # requires a iCal file
 # returned list will have date, time, and start_id in that order
 def CreateEvent_list():
 	file = open('/Users/mjonas/Desktop/Completed.ics', 'r')
-	summaryline = ""														# line containing the start_id from the file
-	dateString = ""															# line containing the date from the file
-	date = 0																# date of event as an int
-	time = 0																# time of event as an int
-	initials = ["cm", "et", "jm", "sb", "dw", "torrance", "ets", "jms"]		# keys to be searched for in the file
-	event_list = []															# list to hold the parsed data
+	summaryline = ""	# line containing the start_id from the file
+	dateString = ""		# line containing the date from the file
+	date = 0			# date of event as an int
+	time = 0			# time of event as an int
+	event_list = []		# list to hold the parsed data
+	
+	key_xids = CreateKeyIds()		# keys to be searched for in the file
 	
 	# returns the date range, the 16th of last month to the 15th of this month
 	(start, end) = FindDateRange()
@@ -52,7 +65,7 @@ def CreateEvent_list():
 					summaryline = summaryline[8:]
 					summaryline = summaryline.lower()
 					# check if the summary is contained in the list of keys, if so loop to gain the date of the event
-					if summaryline in initials:
+					if summaryline in key_ids:
 						for line in file:
 							if "DTSTART" in line:
 								dateString = line
@@ -223,7 +236,7 @@ def GetPrintDate(date):
 # it requires the event_list
 # it prints to the expense.csv file located on the desktop in the format
 # date,distance,start_address,end_address,comments
-def PrintToCsv(aList):
+def PrintToCsv(event_list):
 	count = 0				# number of lines printed to file, used to insert a new line at line 28
 	totalDistance = 0		# total distance, printed and reset each 28 lines printed
 	file = open('/Users/mjonas/Desktop/expense.csv', 'w')
@@ -253,12 +266,157 @@ def printList(event_list):
 		count+=1
 	print "the number of lists printed: %s\n" %(count)
 
-event_list = CreateEvent_list()
-event_list = AssignAddresses(event_list, Event_Index.START_ID)
-event_list = InsertHome(event_list)
-event_list = AssignEndLocation(event_list)
-event_list = AssignAddresses(event_list, Event_Index.END_ID)
-event_list = AssignDistance(event_list)
-event_list = AssignComments(event_list)
-#printList(event_list)
-PrintToCsv(event_list)
+def openMap(address, destination):
+	base_url = 'http://maps.google.com/maps?q='
+	url = base_url + address.replace(' ', '+') + '+to+' + destination.replace(' ', '+')
+	webbrowser.open_new_tab(url)
+
+# create expense CSV
+def createExpense():
+	event_list = CreateEvent_list()
+	event_list = AssignAddresses(event_list, Event_Index.START_ID)
+	event_list = InsertHome(event_list)
+	event_list = AssignEndLocation(event_list)
+	event_list = AssignAddresses(event_list, Event_Index.END_ID)
+	event_list = AssignDistance(event_list)
+	event_list = AssignComments(event_list)
+	#printList(event_list)
+	PrintToCsv(event_list)
+
+# create address list and print
+def printIdAndAddress():
+	address_list = CreateAddressList()
+	print
+	print 'Id\t\tAddress'
+	for item in address_list:
+		print item[0] +'\t\t'+ item[1]
+
+def addIdAndAddress():
+	id = ""
+	address = ""
+	distance = 0
+	distance_list = []
+	
+	#get location name from user
+	id = str(raw_input("Enter location's id(name): "))
+	
+	#get location address from user
+	address = str(raw_input("Enter location's address(without punctuation): "))
+	
+	address_list = CreateAddressList()
+	
+	#openMap() for each possible destination
+	for item in address_list:
+		openMap(address, item[1])
+	
+	#get distances for each possible destination from user in reverse order of how they called to openMap()
+	address_list.reverse()
+	for item in address_list:
+		while True:
+			temp = raw_input("Enter distance between " +id+ " and " +item[0]+ ": ")
+			try:
+				distance = int(temp)
+				distance_list.append([id,item[0],distance])
+				break
+			except ValueError:
+				print "Error -  that was not an integer, try again"
+	
+	#append address file
+	file = open('./addresses.txt', 'a')
+	file.write("%s %s\n" %(id, address))
+	file.close()
+	
+	#append distances file
+	file = open('./distance.txt', 'a')
+	for item in distance_list:
+		file.write("%s %s %s\n" %(item[0], item[1], item[2]))
+	file.close()
+	
+	print "location: %s %s added." %(id, address)
+
+def deleteIdAndAddress():
+	id = ""
+	response = ""
+	item_in_file = False
+
+	while True:
+		#get location name from user
+		print "You would like to permanently delete a location."
+		id = str(raw_input("Enter location's id(name): "))
+		print "Are you sure, you want to delete %s?" %(id)
+		response = str(raw_input("Enter yes to continue or no to cancel: "))
+		response = response.lower()
+
+		if 'n' in response:
+			break
+		elif 'y' in response:
+			address_list = CreateAddressList()
+			for item in address_list:
+				if id in item:
+					item_in_file = True
+					break
+			if item_in_file:
+				# erase lines from address file
+				file = open('./addresses.txt', 'w')
+				for item in address_list:
+					if not id in item:
+						file.write("%s %s\n" %(item[0], item[1]))
+				file.close()
+				# erase lines from distance file
+				distance_list = CreateDistanceList()
+				file = open('./distance.txt', 'w')
+				for item in distance_list:
+					if not id in item:
+						file.write("%s %s %s\n" %(item[0], item[1], item[2]))
+				file.close()
+				print "%s was deleted." %(id)
+				break
+			else:
+				print "%s was not in the list." %(id)
+				break
+		else:
+			print "Error - please enter yes to continue or no to cancel"
+		
+		id = ""
+		response = ""
+		item_in_file = False
+
+def menu():
+	option = 0
+	selection = ""
+	while True:
+		while True:
+			print "\nCreate Expense Menu\n"
+			print "1\tCreate expense"
+			print "2\tShow id and address"
+			print "3\tAdd id and address"
+			print "4\tDelete id and address"
+			print "5\tExit\n"
+			selection = raw_input("Enter selection: ")
+			
+			#check if selection is an int
+			try:
+				option = int(selection)
+				if option > 0 and option < 6:
+					break
+				else:
+					print "Error - enter an integer(1-5), try again"
+			except ValueError:
+				print "Error -  that was not an integer, try again"
+	
+		if option == 1:
+			createExpense()
+		elif option == 2:
+			printIdAndAddress()
+		elif option == 3:
+			addIdAndAddress()
+		elif option == 4:
+			deleteIdAndAddress()
+		else:
+			print "goodbye"
+			break
+		
+		option = 0
+		selection = ""
+
+menu()
