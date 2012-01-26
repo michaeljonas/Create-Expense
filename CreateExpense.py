@@ -5,8 +5,8 @@
 # address, ending address, and comments for while that drive was needed.
 
 # to do:
-# 1 complete documentation
-# 2 change address_list and distance_list to dict
+# 1 change address_list to dict
+# 2 change address and distance files to cvs files
 # 3 add user defined location descriptions
 # 4 add user defined vars i.e. path to ical export, date range, output destination
 # 5 add gui to facilitate the addition of new locations, execution of the program, and change of date range
@@ -26,6 +26,9 @@ class Event_Index:
 	DISTANCE = 6		# driving distance between the two locations
 	COMMENTS = 7		# comments of why the trip was made
 
+# create a list of keys from the address file to use to determine if the entry
+# should be included in the event_list
+# requires ./addresses.txt and returns a list of keys
 def CreateKeyIds():
 	file = open('./addresses.txt', 'r')
 	id = ""
@@ -59,7 +62,7 @@ def CreateEvent_list():
 	for line in file:
 		if "VEVENT" in line:
 			for line in file:
-				if "TRANSP" in line and not "OPAQUE":
+				if "TRANSP" in line and "OPAQUE" not in line:
 					save = False
 					break
 				elif "SUMMARY:" in line:
@@ -67,7 +70,7 @@ def CreateEvent_list():
 					line = line.strip('\r\n')
 					line = line[8:]
 					summaryline = line.lower()
-					if not summaryline in key_ids:
+					if summaryline not in key_ids:
 						save = False
 						break
 					else:
@@ -85,13 +88,12 @@ def CreateEvent_list():
 					break
 		if save and count == 2:
 			event_list.append([date, time, summaryline])
-			count = 0
-		else:
-			save = True
-			summaryline = ""
-			date = 0
-			time = 0
-			count = 0
+
+		save = True
+		summaryline = ""
+		date = 0
+		time = 0
+		count = 0
 
 	# sort the list by date and time
 	event_list.sort()
@@ -125,16 +127,18 @@ def CreateAddressList():
 # reads the location ids with the corrisponding distance between them from a file and creates a list
 # requires a file contianing the location id, id, and distance between them delineated by a space
 # the returned list will have the id, id, and distance in that order
-def CreateDistanceList():
+def CreateDistance():
 	file = open('./distance.txt', 'r')
-	distanceList = []						# list to be returned containing the ids and distances
+	distances = {}						# list to be returned containing the ids and distances
+	temp = []
 	# loop through the file and parse the ids and distances
 	for line in file:
 		line = line.strip('\n')
-		distanceList.append(line.split(" "))
+		temp = line.split(",")
+		distances[temp[0]] = temp[1]
 	
 	file.close()
-	return distanceList
+	return distances
 
 # this function will take the list and append the corrisponding address
 # requires the list of events and the index of the id of the event in the list for which an address will be appended
@@ -187,12 +191,12 @@ def AssignEndLocation(event_list):
 # it requires the event_list and the list of distances between each event
 # returns the event_list with with distances between each event appended
 def AssignDistance(event_list):
-	distanceList = CreateDistanceList()
+	distances = CreateDistance()
 	for i, event in enumerate(event_list):
-		for j, distance in enumerate(distanceList):
-			if ((event[Event_Index.START_ID] == distance[0] and event[Event_Index.END_ID] == distance[1]) or (event[Event_Index.END_ID] == distance[0] and event[Event_Index.START_ID] == distance[1])):
-				event.append(int(distance[2]))
-				break
+		if event[Event_Index.START_ID] < event[Event_Index.END_ID]:
+			event.append(int(distances[event[Event_Index.START_ID] +':'+ event[Event_Index.END_ID]]))
+		else:
+			event.append(int(distances[event[Event_Index.END_ID] +':'+ event[Event_Index.START_ID]]))
 	return event_list
 
 # this function appends the appropriate comments displaying the need for each entry in the expense report
@@ -306,6 +310,8 @@ def printIdAndAddress():
 	for item in address_list:
 		print item[0] +'\t\t'+ item[1]
 
+# add an address and Id to the addresses.txt and appends the distance.txt with the appropriate distances
+# requires ./addresses.txt, ./distance.txt and querys the user for input
 def addIdAndAddress():
 	id = ""
 	address = ""
@@ -331,7 +337,10 @@ def addIdAndAddress():
 			temp = raw_input("Enter distance between " +id+ " and " +item[0]+ ": ")
 			try:
 				distance = int(temp)
-				distance_list.append([id,item[0],distance])
+				if id < item[0]:
+					distance_list.append([id,item[0],distance])
+				else:
+					distance_list.append([item[0],id,distance])
 				break
 			except ValueError:
 				print "Error -  that was not an integer, try again"
@@ -344,11 +353,13 @@ def addIdAndAddress():
 	#append distances file
 	file = open('./distance.txt', 'a')
 	for item in distance_list:
-		file.write("%s %s %s\n" %(item[0], item[1], item[2]))
+		file.write("%s:%s,%s\n" %(item[0], item[1], item[2]))
 	file.close()
 	
 	print "location: %s %s added." %(id, address)
 
+# deletes id and address from the addresses.txt and distances.txt
+# requires input from user, ./addresses.txt, and ./distances.txt
 def deleteIdAndAddress():
 	id = ""
 	response = ""
@@ -367,22 +378,23 @@ def deleteIdAndAddress():
 		elif 'y' in response:
 			address_list = CreateAddressList()
 			for item in address_list:
-				if id in item:
+				if id == item[0]:
 					item_in_file = True
 					break
 			if item_in_file:
 				# erase lines from address file
 				file = open('./addresses.txt', 'w')
 				for item in address_list:
-					if not id in item:
+					if id != item[0]:
 						file.write("%s %s\n" %(item[0], item[1]))
 				file.close()
 				# erase lines from distance file
-				distance_list = CreateDistanceList()
+				distance = CreateDistance()
 				file = open('./distance.txt', 'w')
-				for item in distance_list:
-					if not id in item:
-						file.write("%s %s %s\n" %(item[0], item[1], item[2]))
+				for i, j in distance.iteritems():
+					event_id_list = str(i).split(':')
+					if id != event_id_list[0] and id != event_id_list[1]:
+						file.write("%s,%s\n" %(i, j))
 				file.close()
 				print "%s was deleted." %(id)
 				break
@@ -396,6 +408,7 @@ def deleteIdAndAddress():
 		response = ""
 		item_in_file = False
 
+# prints a menu to the terminal for user control
 def menu():
 	option = 0
 	selection = ""
@@ -435,3 +448,11 @@ def menu():
 		selection = ""
 
 menu()
+#event_list = CreateEvent_list()
+#event_list = AssignAddresses(event_list, Event_Index.START_ID)
+#event_list = InsertHome(event_list)
+#event_list = AssignEndLocation(event_list)
+#event_list = AssignAddresses(event_list, Event_Index.END_ID)
+#event_list = AssignDistance(event_list)
+#event_list = AssignComments(event_list)
+#printList(event_list)
