@@ -5,11 +5,12 @@
 # address, ending address, and comments for while that drive was needed.
 
 # to do:
-# 1 change address_list and distance_list to dict
-# 2 add user defined location descriptions
-# 3 add user defined vars i.e. path to ical export, date range, output destination
-# 4 add gui to facilitate the addition of new locations, execution of the program, and change of date range
-# 5 extend google maps support to replace the need of inputing distances if the user decides to do so
+# 1 complete documentation
+# 2 change address_list and distance_list to dict
+# 3 add user defined location descriptions
+# 4 add user defined vars i.e. path to ical export, date range, output destination
+# 5 add gui to facilitate the addition of new locations, execution of the program, and change of date range
+# 6 extend google maps support to replace the need of inputing distances if the user decides to do so
 
 import webbrowser
 from datetime import date
@@ -43,41 +44,55 @@ def CreateKeyIds():
 def CreateEvent_list():
 	file = open('/Users/mjonas/Desktop/Completed.ics', 'r')
 	summaryline = ""	# line containing the start_id from the file
-	dateString = ""		# line containing the date from the file
 	date = 0			# date of event as an int
 	time = 0			# time of event as an int
+	save = True			# set to false if the event has been deleted
 	event_list = []		# list to hold the parsed data
+	count = 0			# count of correct items saved for each event
 	
-	key_xids = CreateKeyIds()		# keys to be searched for in the file
+	key_ids = CreateKeyIds()		# keys to be searched for in the file
 	
 	# returns the date range, the 16th of last month to the 15th of this month
 	(start, end) = FindDateRange()
 	
 	# loop through the file searching for events that are opaque (not deleted)
 	for line in file:
-		if "OPAQUE" in line:
-			# loop through the file, searching for each line containing "SUMMARY:"
+		if "VEVENT" in line:
 			for line in file:
-				if "SUMMARY:" in line:
-					summaryline = line
+				if "TRANSP" in line and not "OPAQUE":
+					save = False
+					break
+				elif "SUMMARY:" in line:
 					# remove "SUMMARY:" and the unnecessary white space characters
-					summaryline = summaryline.strip('\r\n')
-					summaryline = summaryline[8:]
-					summaryline = summaryline.lower()
-					# check if the summary is contained in the list of keys, if so loop to gain the date of the event
-					if summaryline in key_ids:
-						for line in file:
-							if "DTSTART" in line:
-								dateString = line
-								# parse the date and the time from the line
-								date = int(dateString[33:41])
-								time = int(dateString[42:46])
-								break
-						# if the date is in the needed range (16th of last month<date<15th of this month)
-						# append it to the list
-						if date >= start and date <= end:
-							event_list.append([date, time, summaryline])
+					line = line.strip('\r\n')
+					line = line[8:]
+					summaryline = line.lower()
+					if not summaryline in key_ids:
+						save = False
 						break
+					else:
+						count = count + 1
+				elif "DTSTART" in line:
+					# parse the date and the time from the line
+					date = int(line[33:41])
+					time = int(line[42:46])
+					if date < start or date > end:
+						save = False
+						break
+					else:
+						count = count + 1
+				elif "END:VEVENT" in line:
+					break
+		if save and count == 2:
+			event_list.append([date, time, summaryline])
+			count = 0
+		else:
+			save = True
+			summaryline = ""
+			date = 0
+			time = 0
+			count = 0
+
 	# sort the list by date and time
 	event_list.sort()
 	file.close()
